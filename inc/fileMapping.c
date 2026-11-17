@@ -1,6 +1,8 @@
 #include "fileMapping.h"
 
+#include <stddef.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <errno.h>
 #include <unistd.h>
@@ -9,16 +11,17 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
-typedef struct
+typedef struct FileMapping
 {
   int fd;
   size_t fsize;
   unsigned char *dataPtr;
+  char *fname;
 } FileMapping;
 
 FileMapping *fileMappingCreate(const char *fname)
 {
-  int fd = open(fname, O_RDWR, 0);
+  int fd = open(fname, O_RDWR);
   if (fd < 0)
   {
     printf("fileMappingCreate - open failed, fname = %s, %s\n", fname, strerror(errno));
@@ -66,10 +69,10 @@ void fileMappingClose(FileMapping *mapping)
   free(mapping);
 }
 
-void fileMappingWrite(FileMapping *mapping, char *line, size_t length)
-{
-  write(mapping->fd, line, length);
-}
+// void fileMappingWrite(FileMapping *mapping, char *line, size_t length)
+// {
+
+// }
 
 unsigned char *fileMappingGetPointer(FileMapping *mapping)
 {

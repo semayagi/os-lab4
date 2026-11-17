@@ -18,37 +18,38 @@ stdin → parent → pipe[0] → child1 → pipe[1] → child2 → pipe[2] → p
 
 int main(void)
 {
-
-    FileMapping *shared = fileMappingCreate("file");
-
-    char *line = NULL;
-    size_t capacity = 0; // размер выделенного буфера
-    ssize_t length;
-
-    size_t buffer_capacity = 4096;
-    char buffer[buffer_capacity];
-    ssize_t received = 0;
-
-    while ((length = getline(&line, &capacity, stdin)) != -1)
-    {
-        received += length;
-        if (received > buffer_capacity)
-        {
-            while (received > buffer_capacity)
-                buffer_capacity *= 2;
-
-            char tmp[buffer_capacity];
-            strcpy(tmp, buffer);
-
-            *buffer = tmp;
-        }
-        for (int i = received - length; i < received; ++i)
-        {
-            buffer[i] = line[i - (received - length)];
-        }
+    FILE *out = fopen("file", "wb");
+    if (out == NULL) {
+        perror("fopen");
+        return EXIT_FAILURE;
     }
 
-    // fileMappingWrite(shared, line, (size_t)length);
+    char *line = NULL;
+    size_t capacity = 0;
+    ssize_t length;
+
+    size_t total_length = 0;
+    while ((length = getline(&line, &capacity, stdin)) != -1) {
+        total_length += length;
+        if (fwrite(line, 1, (size_t)length, out) != (size_t)length) {
+            perror("fwrite");
+            free(line);
+            fclose(out);    
+            return EXIT_FAILURE;
+        }
+    }
+    free(line);
+    fclose(out);
+    if(total_length == 0) {
+        return 0;
+    }
+
+    
+    FileMapping *shared = fileMappingCreate("file");
+    if (shared == NULL) {
+
+        return EXIT_FAILURE;
+    }
 
     pid_t child1_pid = fork();
     // Отныне код выполняется двумя процессами: родительский и дочерний
@@ -56,32 +57,34 @@ int main(void)
     // child1_pid = 0 в дочернем и выполняется блок ниже:
     if (child1_pid == 0)
     { // если мы внутри дочернего процесса
-        char *args[] = {"./child1", NULL};
-        execv("./child1", args); // Далее код выполняется только родителем
+        char *args[] = {"./child1", "file", NULL};
+        int result = execv("./child1", args); // Далее код выполняется только родителем
+        if (result != 0)
+            return EXIT_FAILURE;
     }
 
+    int status;
+    waitpid(child1_pid, &status, 0);
     pid_t child2_pid = fork();
     // Снова код выполняется родителем и дочерним процессом
     if (child2_pid == 0)
     {
-        char *args[] = {"./child2", NULL};
-        execv("./child2", args);
+        char *args[] = {"./child2", "file", NULL};
+        int result = execv("./child2", args);
+        if (result != 0)
+            return EXIT_FAILURE;
     }
 
-    buffer[4096];
-
-    // Цикл нужен для случая, когда child2 пишет в pipe[2] больше, чем 4096 символов
-    while ((received = read(pipes[2][0], buffer, sizeof(buffer) - 1)) > 0)
-    {
-        buffer[received] = '\0';
-        printf("%s", buffer);
-    }
-
-    free(line);
-
-    int status;
-    waitpid(child1_pid, &status, 0);
     waitpid(child2_pid, &status, 0);
+
+    unsigned char *data = fileMappingGetPointer(shared);
+    size_t size = fileMappingGetSize(shared);
+    for(size_t i = 0; i < size; ++i) {
+        printf("%c", data[i]);
+    }
+
+    fileMappingClose(shared);
+
 
     return 0;
 }
