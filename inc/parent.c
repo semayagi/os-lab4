@@ -7,45 +7,55 @@ stdin → parent → pipe[0] → child1 → pipe[1] → child2 → pipe[2] → p
 */
 #define _POSIX_C_SOURCE 200809L // Portable Operating System Interface
 
+#include "fileMapping.h"
+
 #include <stdio.h>     // getline, printf, stdin
 #include <stdlib.h>    // free
 #include <unistd.h>    // write, read, fork, dup2, close, execv
-#include <fcntl.h>     // O_RDWR
 #include <sys/types.h> // pid_t, ssize_t
 #include <sys/wait.h>
-#include <sys/stat.h>
+#include <string.h>
 
 int main(void)
 {
-    struct stat statbuf;
-    int fp = open("./file", O_RDWR);
-    fstat(fp, &statbuf);
 
-    int *shared = mmap(
-        /* addr= */ NULL,
-        /* length= */ statbuf.st_size - 1,
-        /* prot= */ PROT_READ | PROT_WRITE,
-        /* flags= */ MAP_SHARED,
-        /* fd= */ fp,
-        /* offset= */ 0);
+    FileMapping *shared = fileMappingCreate("file");
+
+    char *line = NULL;
+    size_t capacity = 0; // размер выделенного буфера
+    ssize_t length;
+
+    size_t buffer_capacity = 4096;
+    char buffer[buffer_capacity];
+    ssize_t received = 0;
+
+    while ((length = getline(&line, &capacity, stdin)) != -1)
+    {
+        received += length;
+        if (received > buffer_capacity)
+        {
+            while (received > buffer_capacity)
+                buffer_capacity *= 2;
+
+            char tmp[buffer_capacity];
+            strcpy(tmp, buffer);
+
+            *buffer = tmp;
+        }
+        for (int i = received - length; i < received; ++i)
+        {
+            buffer[i] = line[i - (received - length)];
+        }
+    }
+
+    // fileMappingWrite(shared, line, (size_t)length);
 
     pid_t child1_pid = fork();
     // Отныне код выполняется двумя процессами: родительский и дочерний
     // child1_pid = PID > 0 (в родительском)
     // child1_pid = 0 в дочернем и выполняется блок ниже:
     if (child1_pid == 0)
-    {                                     // если мы внутри дочернего процесса
-                                          //  int dup2(int oldfd, int newfd) - переназначение файлового дескриптора
-        dup2(pipes[0][0], STDIN_FILENO);  // читать из pipe[0], STDIN_FILENO = 0
-        dup2(pipes[1][1], STDOUT_FILENO); // писать в pipe[1],  STDOUT_FILENO = 1
-        // Что сделали: теперь для child1 stdin - это то, что прилетает ему из pipe[0], а stdout выводится в pipe[1]
-
-        for (int i = 0; i < 3; ++i)
-        {
-            close(pipes[i][0]);
-            close(pipes[i][1]);
-        }
-
+    { // если мы внутри дочернего процесса
         char *args[] = {"./child1", NULL};
         execv("./child1", args); // Далее код выполняется только родителем
     }
@@ -54,39 +64,12 @@ int main(void)
     // Снова код выполняется родителем и дочерним процессом
     if (child2_pid == 0)
     {
-        dup2(pipes[1][0], STDIN_FILENO);
-        dup2(pipes[2][1], STDOUT_FILENO);
-
-        for (int i = 0; i < 3; ++i)
-        {
-            close(pipes[i][0]);
-            close(pipes[i][1]);
-        }
-
         char *args[] = {"./child2", NULL};
         execv("./child2", args);
     }
 
-    // Закрываем ненужные дескрипторы
-    close(pipes[0][0]);
-    close(pipes[1][0]);
-    close(pipes[1][1]);
-    close(pipes[2][1]);
+    buffer[4096];
 
-    char *line = NULL;
-    size_t capacity = 0; // размер выделенного буфера
-    ssize_t length;
-
-    while ((length = getline(&line, &capacity, stdin)) != -1)
-    {
-        write(pipes[0][1], line, (size_t)length);
-    }
-
-    close(pipes[0][1]); // дочерние циклы while ((c = getchar()) != EOF) { ... } завершаются, получив EOF
-
-    char buffer[4096];
-
-    ssize_t received;
     // Цикл нужен для случая, когда child2 пишет в pipe[2] больше, чем 4096 символов
     while ((received = read(pipes[2][0], buffer, sizeof(buffer) - 1)) > 0)
     {
@@ -95,8 +78,6 @@ int main(void)
     }
 
     free(line);
-
-    close(pipes[2][0]);
 
     int status;
     waitpid(child1_pid, &status, 0);
