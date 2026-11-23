@@ -69,11 +69,6 @@ void fileMappingClose(FileMapping *mapping)
   free(mapping);
 }
 
-// void fileMappingWrite(FileMapping *mapping, char *line, size_t length)
-// {
-
-// }
-
 unsigned char *fileMappingGetPointer(FileMapping *mapping)
 {
   return mapping->dataPtr;

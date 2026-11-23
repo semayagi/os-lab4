@@ -13,7 +13,7 @@ gcc -o child1 child1.c && gcc -o child2 child2.c && gcc -o parent parent.c
 ./parent ./child1 ./child2
 ```
 
-# Запуск через CMake
+# Запуск через CMake (на Windows через MSYS2 MSYS)
 ```bash
 cmake -S . -B build
 cmake --build build

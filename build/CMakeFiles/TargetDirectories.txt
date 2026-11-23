@@ -1,0 +1,5 @@
+/d/important/OS/os-lab4/build/CMakeFiles/child1.dir
+/d/important/OS/os-lab4/build/CMakeFiles/child2.dir
+/d/important/OS/os-lab4/build/CMakeFiles/parent.dir
+/d/important/OS/os-lab4/build/CMakeFiles/edit_cache.dir
+/d/important/OS/os-lab4/build/CMakeFiles/rebuild_cache.dir

@@ -1,0 +1,7 @@
+{
+	"InstallScripts" : 
+	[
+		"/d/important/OS/os-lab4/build/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

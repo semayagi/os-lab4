@@ -15,12 +15,13 @@ stdin → parent → pipe[0] → child1 → pipe[1] → child2 → pipe[2] → p
 #include <sys/types.h> // pid_t, ssize_t
 #include <sys/wait.h>
 #include <string.h>
+#include <errno.h>
 
 int main(void)
 {
     FILE *out = fopen("file", "wb");
     if (out == NULL) {
-        perror("fopen");
+        printf("main - fopen failed, %s\n", strerror(errno));
         return EXIT_FAILURE;
     }
 
@@ -32,7 +33,7 @@ int main(void)
     while ((length = getline(&line, &capacity, stdin)) != -1) {
         total_length += length;
         if (fwrite(line, 1, (size_t)length, out) != (size_t)length) {
-            perror("fwrite");
+            printf("main - fwrite failed, %s\n", strerror(errno));
             free(line);
             fclose(out);    
             return EXIT_FAILURE;
@@ -85,8 +86,5 @@ int main(void)
 
     fileMappingClose(shared);
 
-
     return 0;
 }
-
-// cmake

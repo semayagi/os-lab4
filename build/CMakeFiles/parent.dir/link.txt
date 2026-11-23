@@ -1,0 +1,1 @@
+/usr/bin/cc.exe -Wl,--enable-auto-import CMakeFiles/parent.dir/inc/parent.c.o CMakeFiles/parent.dir/inc/fileMapping.c.o -o parent.exe -Wl,--out-implib,libparent.dll.a -Wl,--major-image-version,0,--minor-image-version,0

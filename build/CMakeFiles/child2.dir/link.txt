@@ -1,0 +1,1 @@
+/usr/bin/cc.exe -Wl,--enable-auto-import CMakeFiles/child2.dir/inc/child2.c.o CMakeFiles/child2.dir/inc/fileMapping.c.o -o child2.exe -Wl,--out-implib,libchild2.dll.a -Wl,--major-image-version,0,--minor-image-version,0
