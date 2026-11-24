@@ -20,7 +20,8 @@ stdin → parent → pipe[0] → child1 → pipe[1] → child2 → pipe[2] → p
 int main(void)
 {
     FILE *out = fopen("file", "wb");
-    if (out == NULL) {
+    if (out == NULL)
+    {
         printf("main - fopen failed, %s\n", strerror(errno));
         return EXIT_FAILURE;
     }
@@ -30,29 +31,38 @@ int main(void)
     ssize_t length;
 
     size_t total_length = 0;
-    while ((length = getline(&line, &capacity, stdin)) != -1) {
+    while ((length = getline(&line, &capacity, stdin)) != -1)
+    {
         total_length += length;
-        if (fwrite(line, 1, (size_t)length, out) != (size_t)length) {
+        if (fwrite(line, 1, (size_t)length, out) != (size_t)length)
+        {
             printf("main - fwrite failed, %s\n", strerror(errno));
             free(line);
-            fclose(out);    
+            fclose(out);
             return EXIT_FAILURE;
         }
     }
     free(line);
     fclose(out);
-    if(total_length == 0) {
+    if (total_length == 0)
+    {
         return 0;
     }
 
-    
     FileMapping *shared = fileMappingCreate("file");
-    if (shared == NULL) {
+    if (shared == NULL)
+    {
 
         return EXIT_FAILURE;
     }
 
     pid_t child1_pid = fork();
+    if (child1_pid == -1)
+    {
+        printf("main - fork for child1 failed, %s\n", strerror(errno));
+        fileMappingClose(shared);
+        return EXIT_FAILURE;
+    }
     // Отныне код выполняется двумя процессами: родительский и дочерний
     // child1_pid = PID > 0 (в родительском)
     // child1_pid = 0 в дочернем и выполняется блок ниже:
@@ -65,8 +75,21 @@ int main(void)
     }
 
     int status;
-    waitpid(child1_pid, &status, 0);
+    pid_t ret = waitpid(child1_pid, &status, 0);
+    if (ret == -1)
+    {
+        printf("main - waitpid for child1 failed, %s\n", strerror(errno));
+        fileMappingClose(shared);
+        return EXIT_FAILURE;
+    }
+
     pid_t child2_pid = fork();
+    if (child2_pid == -1)
+    {
+        printf("main - fork for child2 failed, %s\n", strerror(errno));
+        fileMappingClose(shared);
+        return EXIT_FAILURE;
+    }
     // Снова код выполняется родителем и дочерним процессом
     if (child2_pid == 0)
     {
@@ -76,14 +99,22 @@ int main(void)
             return EXIT_FAILURE;
     }
 
-    waitpid(child2_pid, &status, 0);
+    ret = waitpid(child2_pid, &status, 0);
+    if (ret == -1)
+    {
+        printf("main - waitpid for child2 failed, %s\n", strerror(errno));
+        fileMappingClose(shared);
+        return EXIT_FAILURE;
+    }
 
     unsigned char *data = fileMappingGetPointer(shared);
     size_t size = fileMappingGetSize(shared);
-    for(size_t i = 0; i < size; ++i) {
+    printf("\n");
+    for (size_t i = 0; i < size; ++i)
+    {
         printf("%c", data[i]);
     }
-
+    printf("\n");
     fileMappingClose(shared);
 
     return 0;
